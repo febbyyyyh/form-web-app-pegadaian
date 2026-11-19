@@ -10,33 +10,156 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdminRouteRouteImport } from './routes/admin/route'
+import { Route as AppRouteRouteImport } from './routes/app/route'
+import { Route as DaftarRouteImport } from './routes/daftar'
+import { Route as AdminIndexRouteImport } from './routes/admin/index'
+import { Route as AppIndexRouteImport } from './routes/app/index'
+import { Route as AdminFormsIndexRouteImport } from './routes/admin/forms/index'
+import { Route as AppIsiCodeRouteImport } from './routes/app/isi/$code'
+import { Route as AppSuksesCodeRouteImport } from './routes/app/sukses/$code'
+import { Route as AdminFormsFormIdIndexRouteImport } from './routes/admin/forms/$formId/index'
+import { Route as AdminFormsFormIdJawabanRouteImport } from './routes/admin/forms/$formId/jawaban'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminRouteRoute = AdminRouteRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AppRouteRoute = AppRouteRouteImport.update({
+  id: '/app',
+  path: '/app',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DaftarRoute = DaftarRouteImport.update({
+  id: '/daftar',
+  path: '/daftar',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminRouteRoute,
+} as any)
+const AppIndexRoute = AppIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AdminFormsIndexRoute = AdminFormsIndexRouteImport.update({
+  id: '/forms/',
+  path: '/forms/',
+  getParentRoute: () => AdminRouteRoute,
+} as any)
+const AppIsiCodeRoute = AppIsiCodeRouteImport.update({
+  id: '/isi/$code',
+  path: '/isi/$code',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppSuksesCodeRoute = AppSuksesCodeRouteImport.update({
+  id: '/sukses/$code',
+  path: '/sukses/$code',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AdminFormsFormIdIndexRoute = AdminFormsFormIdIndexRouteImport.update({
+  id: '/forms/$formId/',
+  path: '/forms/$formId/',
+  getParentRoute: () => AdminRouteRoute,
+} as any)
+const AdminFormsFormIdJawabanRoute = AdminFormsFormIdJawabanRouteImport.update({
+  id: '/forms/$formId/jawaban',
+  path: '/forms/$formId/jawaban',
+  getParentRoute: () => AdminRouteRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteRouteWithChildren
+  '/app': typeof AppRouteRouteWithChildren
+  '/daftar': typeof DaftarRoute
+  '/admin/': typeof AdminIndexRoute
+  '/app/': typeof AppIndexRoute
+  '/app/isi/$code': typeof AppIsiCodeRoute
+  '/app/sukses/$code': typeof AppSuksesCodeRoute
+  '/admin/forms/': typeof AdminFormsIndexRoute
+  '/admin/forms/$formId/jawaban': typeof AdminFormsFormIdJawabanRoute
+  '/admin/forms/$formId/': typeof AdminFormsFormIdIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/daftar': typeof DaftarRoute
+  '/admin': typeof AdminIndexRoute
+  '/app': typeof AppIndexRoute
+  '/app/isi/$code': typeof AppIsiCodeRoute
+  '/app/sukses/$code': typeof AppSuksesCodeRoute
+  '/admin/forms': typeof AdminFormsIndexRoute
+  '/admin/forms/$formId/jawaban': typeof AdminFormsFormIdJawabanRoute
+  '/admin/forms/$formId': typeof AdminFormsFormIdIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteRouteWithChildren
+  '/app': typeof AppRouteRouteWithChildren
+  '/daftar': typeof DaftarRoute
+  '/admin/': typeof AdminIndexRoute
+  '/app/': typeof AppIndexRoute
+  '/app/isi/$code': typeof AppIsiCodeRoute
+  '/app/sukses/$code': typeof AppSuksesCodeRoute
+  '/admin/forms/': typeof AdminFormsIndexRoute
+  '/admin/forms/$formId/jawaban': typeof AdminFormsFormIdJawabanRoute
+  '/admin/forms/$formId/': typeof AdminFormsFormIdIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/admin'
+    | '/app'
+    | '/daftar'
+    | '/admin/'
+    | '/app/'
+    | '/app/isi/$code'
+    | '/app/sukses/$code'
+    | '/admin/forms/'
+    | '/admin/forms/$formId/jawaban'
+    | '/admin/forms/$formId/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/daftar'
+    | '/admin'
+    | '/app'
+    | '/app/isi/$code'
+    | '/app/sukses/$code'
+    | '/admin/forms'
+    | '/admin/forms/$formId/jawaban'
+    | '/admin/forms/$formId'
+  id:
+    | '__root__'
+    | '/'
+    | '/admin'
+    | '/app'
+    | '/daftar'
+    | '/admin/'
+    | '/app/'
+    | '/app/isi/$code'
+    | '/app/sukses/$code'
+    | '/admin/forms/'
+    | '/admin/forms/$formId/jawaban'
+    | '/admin/forms/$formId/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRouteRoute: typeof AdminRouteRouteWithChildren
+  AppRouteRoute: typeof AppRouteRouteWithChildren
+  DaftarRoute: typeof DaftarRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +171,118 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/app': {
+      id: '/app'
+      path: '/app'
+      fullPath: '/app'
+      preLoaderRoute: typeof AppRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/daftar': {
+      id: '/daftar'
+      path: '/daftar'
+      fullPath: '/daftar'
+      preLoaderRoute: typeof DaftarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/': {
+      id: '/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof AdminRouteRoute
+    }
+    '/app/': {
+      id: '/app/'
+      path: '/'
+      fullPath: '/app/'
+      preLoaderRoute: typeof AppIndexRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/admin/forms/': {
+      id: '/admin/forms/'
+      path: '/forms'
+      fullPath: '/admin/forms/'
+      preLoaderRoute: typeof AdminFormsIndexRouteImport
+      parentRoute: typeof AdminRouteRoute
+    }
+    '/app/isi/$code': {
+      id: '/app/isi/$code'
+      path: '/isi/$code'
+      fullPath: '/app/isi/$code'
+      preLoaderRoute: typeof AppIsiCodeRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/sukses/$code': {
+      id: '/app/sukses/$code'
+      path: '/sukses/$code'
+      fullPath: '/app/sukses/$code'
+      preLoaderRoute: typeof AppSuksesCodeRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/admin/forms/$formId/': {
+      id: '/admin/forms/$formId/'
+      path: '/forms/$formId'
+      fullPath: '/admin/forms/$formId/'
+      preLoaderRoute: typeof AdminFormsFormIdIndexRouteImport
+      parentRoute: typeof AdminRouteRoute
+    }
+    '/admin/forms/$formId/jawaban': {
+      id: '/admin/forms/$formId/jawaban'
+      path: '/forms/$formId/jawaban'
+      fullPath: '/admin/forms/$formId/jawaban'
+      preLoaderRoute: typeof AdminFormsFormIdJawabanRouteImport
+      parentRoute: typeof AdminRouteRoute
+    }
   }
 }
 
+interface AdminRouteRouteChildren {
+  AdminIndexRoute: typeof AdminIndexRoute
+  AdminFormsIndexRoute: typeof AdminFormsIndexRoute
+  AdminFormsFormIdJawabanRoute: typeof AdminFormsFormIdJawabanRoute
+  AdminFormsFormIdIndexRoute: typeof AdminFormsFormIdIndexRoute
+}
+
+const AdminRouteRouteChildren: AdminRouteRouteChildren = {
+  AdminIndexRoute: AdminIndexRoute,
+  AdminFormsIndexRoute: AdminFormsIndexRoute,
+  AdminFormsFormIdJawabanRoute: AdminFormsFormIdJawabanRoute,
+  AdminFormsFormIdIndexRoute: AdminFormsFormIdIndexRoute,
+}
+
+const AdminRouteRouteWithChildren = AdminRouteRoute._addFileChildren(
+  AdminRouteRouteChildren,
+)
+
+interface AppRouteRouteChildren {
+  AppIndexRoute: typeof AppIndexRoute
+  AppIsiCodeRoute: typeof AppIsiCodeRoute
+  AppSuksesCodeRoute: typeof AppSuksesCodeRoute
+}
+
+const AppRouteRouteChildren: AppRouteRouteChildren = {
+  AppIndexRoute: AppIndexRoute,
+  AppIsiCodeRoute: AppIsiCodeRoute,
+  AppSuksesCodeRoute: AppSuksesCodeRoute,
+}
+
+const AppRouteRouteWithChildren = AppRouteRoute._addFileChildren(
+  AppRouteRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRouteRoute: AdminRouteRouteWithChildren,
+  AppRouteRoute: AppRouteRouteWithChildren,
+  DaftarRoute: DaftarRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -5,22 +5,28 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 disabled:cursor-not-allowed [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-semibold cursor-pointer transition-all duration-150 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-ring/30 active:scale-95 disabled:pointer-events-none disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground shadow hover:bg-primary/90",
-        destructive: "bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90",
+        default:
+          "rounded-full bg-gradient-brand text-primary-foreground shadow-brand hover:brightness-110",
+        brand:
+          "rounded-full bg-gradient-brand text-primary-foreground shadow-brand hover:brightness-110",
+        brandOutline:
+          "rounded-full border-2 border-primary bg-card text-primary hover:bg-mint-soft",
+        destructive:
+          "rounded-full bg-destructive text-primary-foreground shadow-sm hover:brightness-105",
         outline:
-          "border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground",
-        secondary: "bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80",
-        ghost: "hover:bg-accent hover:text-accent-foreground",
+          "rounded-full border border-input bg-card text-foreground shadow-sm hover:bg-mint-soft hover:text-mint-foreground",
+        secondary: "rounded-full bg-mint-soft text-mint-foreground hover:bg-mint",
+        ghost: "rounded-full text-muted-foreground hover:bg-mint-soft hover:text-mint-foreground",
         link: "text-primary underline-offset-4 hover:underline",
       },
       size: {
-        default: "h-9 px-4 py-2",
-        sm: "h-8 rounded-md px-3 text-xs",
-        lg: "h-10 rounded-md px-8",
+        default: "h-10 px-5 py-2",
+        sm: "h-8 px-3 text-xs",
+        lg: "h-12 px-6 py-3 text-base",
         icon: "h-9 w-9",
       },
     },
