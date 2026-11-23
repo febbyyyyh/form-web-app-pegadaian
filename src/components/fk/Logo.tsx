@@ -1,29 +1,16 @@
 import { cn } from "@/lib/utils";
+import pegadaianLogo from "@/assets/logo-pegadaian.svg";
 
-export function LogoMark({ className }: { className?: string }) {
+export function PegadaianLogo({ className }: { className?: string }) {
   return (
-    <div
-      className={cn(
-        "grid size-10 shrink-0 place-items-center rounded-full bg-gradient-brand font-display text-lg font-extrabold text-primary-foreground shadow-brand",
-        className,
-      )}
-      aria-hidden
-    >
-      F
-    </div>
+    <img
+      src={pegadaianLogo}
+      alt="Pegadaian"
+      className={cn("h-10 w-auto shrink-0 object-contain", className)}
+    />
   );
 }
 
-export function Logo({ subtitle = "Pegadaian Kanwil" }: { subtitle?: string }) {
-  return (
-    <div className="flex items-center gap-3">
-      <LogoMark />
-      <div className="leading-tight">
-        <div className="font-display text-base font-extrabold tracking-tight text-foreground">
-          FormKanwil
-        </div>
-        <div className="text-xs text-muted-foreground">{subtitle}</div>
-      </div>
-    </div>
-  );
+export function Logo() {
+  return <PegadaianLogo />;
 }

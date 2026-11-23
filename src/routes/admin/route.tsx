@@ -1,5 +1,5 @@
 import { createFileRoute, Link, Outlet, redirect, useLocation } from "@tanstack/react-router";
-import { FileText, LayoutDashboard, Users } from "lucide-react";
+import { FileText, LayoutDashboard, ShieldCheck } from "lucide-react";
 
 import { AppHeader } from "@/components/fk/AppHeader";
 import { FullPageSpinner } from "@/components/fk/States";
@@ -34,14 +34,14 @@ function AdminLayout() {
         <FileText className="size-4" /> Kelola Form
       </Link>
       <Link to="/admin/users" className={navClass}>
-        <Users className="size-4" /> User & Unit
+        <ShieldCheck className="size-4" /> Akun Admin
       </Link>
     </>
   );
 
   return (
     <div className="min-h-screen bg-gradient-page">
-      <AppHeader user={user} homeTo="/admin" subtitle="Panel Admin" nav={nav} />
+      <AppHeader user={user} homeTo="/admin" nav={nav} />
       <main key={pathname} className="mx-auto max-w-6xl animate-page-in px-4 py-8 sm:px-6 sm:py-10">
         <Outlet />
       </main>

@@ -6,7 +6,6 @@ export interface User {
   password: string;
   name: string;
   email: string;
-  unit: string;
   tagline?: string;
   role: Role;
   active: boolean;
@@ -14,14 +13,7 @@ export interface User {
 }
 
 export type QuestionType =
-  | "short"
-  | "long"
-  | "single"
-  | "multiple"
-  | "dropdown"
-  | "rating"
-  | "number"
-  | "date";
+  "short" | "long" | "single" | "multiple" | "dropdown" | "rating" | "number" | "date";
 
 export interface Question {
   id: string;
@@ -30,6 +22,12 @@ export interface Question {
   help?: string;
   required: boolean;
   options?: string[];
+  pageId?: string;
+}
+
+export interface FormPage {
+  id: string;
+  title: string;
 }
 
 export interface Form {
@@ -39,6 +37,8 @@ export interface Form {
   description: string;
   emoji: string;
   active: boolean;
+  status?: "draft" | "active" | "closed";
+  pages?: FormPage[];
   questions: Question[];
   createdAt: string;
   updatedAt: string;
@@ -50,7 +50,7 @@ export type Answers = Record<string, AnswerValue | undefined>;
 export interface FormResponse {
   id: string;
   formId: string;
-  userId: string;
+  userId: string | null;
   answers: Answers;
   submittedAt: string;
 }
@@ -58,7 +58,6 @@ export interface FormResponse {
 export interface Database {
   version: 1;
   users: User[];
-  units: string[];
   forms: Form[];
   responses: FormResponse[];
 }

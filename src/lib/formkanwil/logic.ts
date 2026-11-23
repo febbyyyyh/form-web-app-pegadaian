@@ -4,12 +4,12 @@ import {
   type AnswerValue,
   type Database,
   type Form,
+  type FormPage,
   type FormResponse,
   type Question,
   type User,
 } from "./types";
 
-export const XP_PER_FORM = 10;
 export const RATING_MAX = 5;
 
 export function uid(prefix = "id"): string {
@@ -31,69 +31,14 @@ export type AuthResult = { ok: true; user: User } | { ok: false; error: string }
 export function authenticate(db: Database, username: string, password: string): AuthResult {
   const uname = normalizeUsername(username);
   if (!uname || !password) return { ok: false, error: "Username dan password wajib diisi ya." };
-  const user = db.users.find((u) => u.username === uname);
-  if (!user || user.password !== password) {
+  const user = db.users.find((u) => u.role === "admin");
+  if (!user || user.username !== uname || user.password !== password) {
     return { ok: false, error: "Username atau password salah. Coba cek lagi, ya!" };
   }
   if (!user.active) {
     return { ok: false, error: "Akun kamu sedang dinonaktifkan. Hubungi admin Kanwil." };
   }
   return { ok: true, user };
-}
-
-export interface RegisterInput {
-  name: string;
-  username: string;
-  email: string;
-  password: string;
-  unit: string;
-  tagline?: string;
-}
-
-export type RegisterErrors = Partial<Record<keyof RegisterInput, string>>;
-
-export function validateRegistration(db: Database, input: RegisterInput): RegisterErrors {
-  const errors: RegisterErrors = {};
-  const uname = normalizeUsername(input.username);
-  if (input.name.trim().length < 3) errors.name = "Nama lengkap minimal 3 huruf.";
-  if (!/^[a-z0-9._]{3,20}$/.test(uname)) {
-    errors.username = "Username 3–20 karakter: huruf kecil, angka, titik, atau underscore.";
-  } else if (db.users.some((u) => u.username === uname)) {
-    errors.username = "Username ini sudah dipakai. Coba yang lain!";
-  }
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.email.trim())) {
-    errors.email = "Format email belum benar.";
-  }
-  if (input.password.length < 6) errors.password = "Password minimal 6 karakter.";
-  if (!db.units.includes(input.unit)) errors.unit = "Pilih unit kerja kamu dulu.";
-  if ((input.tagline ?? "").length > 80) errors.tagline = "Tagline maksimal 80 karakter.";
-  return errors;
-}
-
-export type RegisterResult =
-  | { ok: true; db: Database; user: User }
-  | { ok: false; errors: RegisterErrors };
-
-export function registerUser(
-  db: Database,
-  input: RegisterInput,
-  now = new Date(),
-): RegisterResult {
-  const errors = validateRegistration(db, input);
-  if (Object.keys(errors).length > 0) return { ok: false, errors };
-  const user: User = {
-    id: uid("usr"),
-    username: normalizeUsername(input.username),
-    password: input.password,
-    name: input.name.trim(),
-    email: input.email.trim().toLowerCase(),
-    unit: input.unit,
-    tagline: input.tagline?.trim() || undefined,
-    role: "user",
-    active: true,
-    createdAt: now.toISOString(),
-  };
-  return { ok: true, user, db: { ...db, users: [...db.users, user] } };
 }
 
 /* ---------------- Forms ---------------- */
@@ -111,12 +56,10 @@ export function lookupForm(db: Database, rawCode: string): LookupResult {
   return { ok: true, form };
 }
 
-export function findResponse(db: Database, formId: string, userId: string) {
-  return db.responses.find((r) => r.formId === formId && r.userId === userId);
-}
-
-export function hasSubmitted(db: Database, formId: string, userId: string): boolean {
-  return Boolean(findResponse(db, formId, userId));
+export function createFormShareLink(origin: string, code: string): string {
+  const url = new URL("/app", origin);
+  url.searchParams.set("code", normalizeCode(code));
+  return url.toString();
 }
 
 export function isAnswered(value: AnswerValue | undefined): boolean {
@@ -124,6 +67,24 @@ export function isAnswered(value: AnswerValue | undefined): boolean {
   if (Array.isArray(value)) return value.length > 0;
   if (typeof value === "number") return !Number.isNaN(value);
   return value.trim().length > 0;
+}
+
+export function getFormPages(form: Form): FormPage[] {
+  return form.pages?.length
+    ? form.pages
+    : [
+        {
+          id: form.questions.find((question) => question.pageId)?.pageId ?? "page-1",
+          title: "Halaman 1",
+        },
+      ];
+}
+
+export function getPageQuestions(form: Form, pageId: string): Question[] {
+  const pages = getFormPages(form);
+  return form.questions.filter(
+    (question) => question.pageId === pageId || (!question.pageId && pages[0]?.id === pageId),
+  );
 }
 
 export function validateAnswers(form: Form, answers: Answers): Record<string, string> {
@@ -136,7 +97,8 @@ export function validateAnswers(form: Form, answers: Answers): Record<string, st
     }
     if (q.type === "rating") {
       const n = Number(value);
-      if (!Number.isInteger(n) || n < 1 || n > RATING_MAX) errors[q.id] = "Pilih 1 sampai 5 bintang.";
+      if (!Number.isInteger(n) || n < 1 || n > RATING_MAX)
+        errors[q.id] = "Pilih 1 sampai 5 bintang.";
     }
     if (q.type === "number" && Number.isNaN(Number(value))) {
       errors[q.id] = "Isi dengan angka, ya.";
@@ -151,22 +113,21 @@ export function validateAnswers(form: Form, answers: Answers): Record<string, st
 
 export type SubmitResult =
   | { ok: true; db: Database; response: FormResponse }
-  | { ok: false; reason: "already_submitted" | "inactive" | "invalid"; errors?: Record<string, string> };
+  | { ok: false; reason: "inactive" | "invalid"; errors?: Record<string, string> };
 
 export function submitResponse(
   db: Database,
-  params: { formId: string; userId: string; answers: Answers },
+  params: { formId: string; answers: Answers },
   now = new Date(),
 ): SubmitResult {
   const form = db.forms.find((f) => f.id === params.formId);
   if (!form || !form.active) return { ok: false, reason: "inactive" };
-  if (hasSubmitted(db, form.id, params.userId)) return { ok: false, reason: "already_submitted" };
   const errors = validateAnswers(form, params.answers);
   if (Object.keys(errors).length > 0) return { ok: false, reason: "invalid", errors };
   const response: FormResponse = {
     id: uid("rsp"),
     formId: form.id,
-    userId: params.userId,
+    userId: null,
     answers: params.answers,
     submittedAt: now.toISOString(),
   };
@@ -189,14 +150,25 @@ export function validateFormDraft(db: Database, form: Form): string | null {
   const code = normalizeCode(form.code);
   if (!form.title.trim()) return "Judul form wajib diisi.";
   if (!/^[A-Z0-9]{4,12}$/.test(code)) return "Kode form 4–12 karakter huruf/angka.";
-  if (db.forms.some((f) => f.code === code && f.id !== form.id)) return "Kode form sudah dipakai form lain.";
+  if (db.forms.some((f) => f.code === code && f.id !== form.id))
+    return "Kode form sudah dipakai form lain.";
+  if (getFormPages(form).some((page) => !page.title.trim())) return "Nama halaman wajib diisi.";
+  if (
+    form.questions.some(
+      (question) =>
+        question.pageId && !getFormPages(form).some((page) => page.id === question.pageId),
+    )
+  ) {
+    return "Ada pertanyaan yang belum memiliki halaman.";
+  }
   if (form.questions.length === 0) return "Tambahkan minimal satu pertanyaan.";
   for (const [i, q] of form.questions.entries()) {
     if (!q.label.trim()) return `Pertanyaan #${i + 1} belum punya teks.`;
     if (CHOICE_TYPES.includes(q.type)) {
       const opts = (q.options ?? []).map((o) => o.trim()).filter(Boolean);
       if (opts.length < 2) return `Pertanyaan #${i + 1} butuh minimal 2 pilihan.`;
-      if (new Set(opts).size !== opts.length) return `Pilihan di pertanyaan #${i + 1} ada yang kembar.`;
+      if (new Set(opts).size !== opts.length)
+        return `Pilihan di pertanyaan #${i + 1} ada yang kembar.`;
     }
   }
   return null;
@@ -212,19 +184,20 @@ export function formatAnswer(question: Question, value: AnswerValue | undefined)
 }
 
 function csvCell(value: string): string {
-  if (/[",\n\r;]/.test(value)) return `"${value.replace(/"/g, '""')}"`;
-  return value;
+  const isNumeric = /^-?(?:\d+(?:\.\d+)?|\.\d+)$/.test(value);
+  const safeValue = /^[\t\r ]*[=+\-@]/.test(value) && !isNumeric ? `'${value}` : value;
+  if (/[",\n\r;]/.test(safeValue)) return `"${safeValue.replace(/"/g, '""')}"`;
+  return safeValue;
 }
 
 export function responsesToCsv(form: Form, responses: FormResponse[], users: User[]): string {
-  const header = ["Waktu", "Nama", "Username", "Unit", ...form.questions.map((q) => q.label)];
+  const header = ["ID jawaban", "Waktu", "Nama responden", ...form.questions.map((q) => q.label)];
   const rows = responses.map((r) => {
-    const u = users.find((x) => x.id === r.userId);
+    const u = r.userId ? users.find((x) => x.id === r.userId) : undefined;
     return [
+      r.id,
       new Date(r.submittedAt).toLocaleString("id-ID"),
-      u?.name ?? "(akun dihapus)",
-      u?.username ?? "-",
-      u?.unit ?? "-",
+      u?.name ?? "Responden anonim",
       ...form.questions.map((q) => formatAnswer(q, r.answers[q.id])),
     ];
   });

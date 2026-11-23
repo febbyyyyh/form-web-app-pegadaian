@@ -49,7 +49,7 @@ export function QuestionField({
           id={inputId}
           value={(value as string) ?? ""}
           onChange={(e) => onChange(e.target.value)}
-          placeholder="Ceritakan di sini, bebas kok…"
+          placeholder="Ketik jawaban anda disini"
           disabled={disabled}
           aria-invalid={invalid}
         />

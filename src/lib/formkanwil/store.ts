@@ -1,19 +1,36 @@
 import { useSyncExternalStore } from "react";
 
-import { createSeed } from "./seed";
+import { createInitialDatabase } from "./seed";
 import type { Database, User } from "./types";
 
 /*
- * Browser-only demo store. All data lives in localStorage so the app runs with no backend.
+ * Browser-only store. All data lives in localStorage so the app runs with no backend.
  * Swap these functions for real API calls when a backend is connected.
  */
-const DB_KEY = "formkanwil:db:v1";
-const SESSION_KEY = "formkanwil:session:v1";
+const DB_KEY = "formkanwil:db:v5";
+const LEGACY_DB_KEYS = ["formkanwil:db:v2", "formkanwil:db:v3"];
+const PREVIOUS_DB_KEY = "formkanwil:db:v4";
+const SESSION_KEY = "formkanwil:session:v2";
+const LEGACY_SESSION_KEY = "formkanwil:session:v1";
 
-const SERVER_SNAPSHOT = createSeed(Date.UTC(2026, 0, 1));
+const SERVER_SNAPSHOT = createInitialDatabase();
 let dbCache: Database | null = null;
 let sessionCache: string | null | undefined;
 const listeners = new Set<() => void>();
+
+type PreviousDatabase = Omit<Database, "users"> & {
+  users: Array<User & { unit?: string }>;
+  units?: string[];
+};
+
+function keepSingleAdmin(database: Database): Database {
+  const primaryAdmin = database.users.find((user) => user.role === "admin");
+  if (!primaryAdmin) return database;
+  const users = database.users.filter(
+    (user) => user.role !== "admin" || user.id === primaryAdmin.id,
+  );
+  return users.length === database.users.length ? database : { ...database, users };
+}
 
 const isBrowser = () => typeof window !== "undefined" && typeof localStorage !== "undefined";
 
@@ -25,8 +42,7 @@ function subscribe(listener: () => void) {
   listeners.add(listener);
   const onStorage = (e: StorageEvent) => {
     if (e.key === DB_KEY) dbCache = null;
-    if (e.key === SESSION_KEY) sessionCache = undefined;
-    if (e.key === DB_KEY || e.key === SESSION_KEY) listener();
+    if (e.key === DB_KEY) listener();
   };
   window.addEventListener("storage", onStorage);
   return () => {
@@ -39,37 +55,59 @@ export function getDb(): Database {
   if (!isBrowser()) return SERVER_SNAPSHOT;
   if (dbCache) return dbCache;
   try {
+    for (const key of LEGACY_DB_KEYS) localStorage.removeItem(key);
     const raw = localStorage.getItem(DB_KEY);
-    dbCache = raw ? (JSON.parse(raw) as Database) : createSeed();
-    if (!raw) localStorage.setItem(DB_KEY, JSON.stringify(dbCache));
-  } catch {
-    dbCache = createSeed();
+    let database: Database;
+    if (raw) {
+      database = JSON.parse(raw) as Database;
+    } else {
+      const previousRaw = localStorage.getItem(PREVIOUS_DB_KEY);
+      if (previousRaw) {
+        const previous = JSON.parse(previousRaw) as PreviousDatabase;
+        database = {
+          version: previous.version,
+          users: previous.users.map((previousUser) => {
+            const user = { ...previousUser };
+            delete user.unit;
+            return user;
+          }),
+          forms: previous.forms,
+          responses: previous.responses,
+        };
+        localStorage.removeItem(PREVIOUS_DB_KEY);
+      } else {
+        database = createInitialDatabase();
+      }
+    }
+    database = keepSingleAdmin(database);
+    localStorage.setItem(DB_KEY, JSON.stringify(database));
+    dbCache = database;
+  } catch (error) {
+    console.error("Gagal memuat data FormKanwil dari penyimpanan lokal.", error);
+    dbCache = createInitialDatabase();
   }
   return dbCache;
 }
 
 export function setDb(next: Database | ((db: Database) => Database)) {
-  const value = typeof next === "function" ? next(getDb()) : next;
+  const value = keepSingleAdmin(typeof next === "function" ? next(getDb()) : next);
   dbCache = value;
   if (isBrowser()) localStorage.setItem(DB_KEY, JSON.stringify(value));
   emit();
 }
 
-export function resetDemoData() {
-  setDb(createSeed());
-}
-
 export function getSessionUserId(): string | null {
   if (!isBrowser()) return null;
-  if (sessionCache === undefined) sessionCache = localStorage.getItem(SESSION_KEY);
+  if (sessionCache === undefined) sessionCache = sessionStorage.getItem(SESSION_KEY);
   return sessionCache;
 }
 
 export function setSession(userId: string | null) {
   sessionCache = userId;
   if (isBrowser()) {
-    if (userId) localStorage.setItem(SESSION_KEY, userId);
-    else localStorage.removeItem(SESSION_KEY);
+    if (userId) sessionStorage.setItem(SESSION_KEY, userId);
+    else sessionStorage.removeItem(SESSION_KEY);
+    localStorage.removeItem(LEGACY_SESSION_KEY);
   }
   emit();
 }

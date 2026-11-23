@@ -1,11 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Home, KeyRound, Trophy } from "lucide-react";
+import { KeyRound } from "lucide-react";
 
-import successCharacter from "@/assets/success-character.webp.asset.json";
 import { Confetti } from "@/components/fk/Decor";
 import { Button } from "@/components/ui/button";
-import { normalizeCode, XP_PER_FORM } from "@/lib/formkanwil/logic";
-import { useCurrentUser, useDb } from "@/lib/formkanwil/store";
+import { normalizeCode } from "@/lib/formkanwil/logic";
+import { useDb } from "@/lib/formkanwil/store";
 
 export const Route = createFileRoute("/app/sukses/$code")({
   head: () => ({
@@ -24,53 +23,38 @@ export const Route = createFileRoute("/app/sukses/$code")({
 function SuccessPage() {
   const { code } = Route.useParams();
   const db = useDb();
-  const user = useCurrentUser()!;
   const form = db.forms.find((f) => f.code === normalizeCode(code));
-  const total = db.responses.filter((r) => r.userId === user.id).length;
 
   return (
-    <div className="relative overflow-hidden rounded-3xl border border-border bg-gradient-hero px-6 py-10 text-center shadow-lift sm:px-10">
-      <Confetti count={40} falling />
-      <div className="relative">
-        <img
-          src={successCharacter.url}
-          alt="Karakter pegawai melompat gembira memegang ponsel bertanda centang"
-          width={640}
-          height={960}
-          className="illustration-blend mx-auto h-64 w-auto animate-pop-in sm:h-72"
-        />
-        <h1 className="mt-4 font-display text-3xl font-extrabold tracking-tight sm:text-4xl">
-          Yeay! Jawabanmu terkirim 🎉
-        </h1>
-        <p className="mx-auto mt-2 max-w-md text-muted-foreground">
-          Terima kasih, {user.name.split(" ")[0]}! Masukanmu untuk{" "}
-          <strong className="text-foreground">{form?.title ?? "form ini"}</strong> sudah kami terima.
-          Setiap isian berarti. Setiap suara didengar.
-        </p>
+    <main className="min-h-screen bg-gradient-page px-4 py-8 sm:px-6 sm:py-10">
+      <div className="relative mx-auto max-w-3xl overflow-hidden rounded-3xl border border-border bg-gradient-hero px-6 py-10 text-center shadow-lift sm:px-10">
+        <Confetti count={40} falling />
+        <div className="relative">
+          <img
+            src="/success-illustration.svg"
+            alt="Ilustrasi pegawai merayakan keberhasilan pengiriman form"
+            width={420}
+            height={300}
+            className="mx-auto h-52 w-auto animate-pop-in sm:h-60"
+          />
+          <h1 className="mt-4 font-display text-3xl font-extrabold tracking-tight sm:text-4xl">
+            Yeay! Jawabanmu terkirim 🎉
+          </h1>
+          <p className="mx-auto mt-2 max-w-md text-muted-foreground">
+            Terima kasih! Jawaban untuk{" "}
+            <strong className="text-foreground">{form?.title ?? "form ini"}</strong> sudah kami
+            terima.
+          </p>
 
-        <div className="mx-auto mt-6 flex w-fit animate-pop-in items-center gap-3 rounded-2xl bg-gold-soft px-5 py-3 [animation-delay:300ms]">
-          <div className="grid size-10 place-items-center rounded-full bg-gold text-navy">
-            <Trophy className="size-5" />
+          <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
+            <Button asChild size="lg">
+              <Link to="/app">
+                <KeyRound /> Isi form lain
+              </Link>
+            </Button>
           </div>
-          <div className="text-left">
-            <div className="font-display text-lg font-extrabold text-gold-foreground">+{XP_PER_FORM} XP</div>
-            <div className="text-xs text-gold-foreground">Total {total * XP_PER_FORM} XP · {total} form diisi</div>
-          </div>
-        </div>
-
-        <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
-          <Button asChild size="lg">
-            <Link to="/app">
-              <Home /> Kembali ke Beranda
-            </Link>
-          </Button>
-          <Button asChild variant="brandOutline" size="lg">
-            <Link to="/app">
-              <KeyRound /> Isi form lain
-            </Link>
-          </Button>
         </div>
       </div>
-    </div>
+    </main>
   );
 }

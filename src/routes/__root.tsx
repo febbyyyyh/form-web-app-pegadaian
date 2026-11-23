@@ -85,14 +85,16 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { title: "FormKanwil — Form internal Pegadaian Kanwil" },
       {
         name: "description",
-        content: "Platform form internal Pegadaian Kanwil. Setiap isian berarti. Setiap suara didengar.",
+        content:
+          "Platform form internal Pegadaian Kanwil. Setiap isian berarti. Setiap suara didengar.",
       },
       { name: "author", content: "Pegadaian Kanwil" },
       { name: "theme-color", content: "#0E9F6E" },
       { property: "og:title", content: "FormKanwil — Form internal Pegadaian Kanwil" },
       {
         property: "og:description",
-        content: "Platform form internal Pegadaian Kanwil. Setiap isian berarti. Setiap suara didengar.",
+        content:
+          "Platform form internal Pegadaian Kanwil. Setiap isian berarti. Setiap suara didengar.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -102,7 +104,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         rel: "stylesheet",
         href: appCss,
       },
-      { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+      { rel: "icon", href: "/favicon.svg?v=2", type: "image/svg+xml" },
+      { rel: "alternate icon", href: "/favicon.ico?v=2", type: "image/x-icon" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {

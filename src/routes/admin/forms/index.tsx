@@ -28,7 +28,10 @@ export const Route = createFileRoute("/admin/forms/")({
   head: () => ({
     meta: [
       { title: "Kelola Form — FormKanwil" },
-      { name: "description", content: "Buat, aktifkan, dan kelola form internal Pegadaian Kanwil." },
+      {
+        name: "description",
+        content: "Buat, aktifkan, dan kelola form internal Pegadaian Kanwil.",
+      },
       { property: "og:title", content: "Kelola Form — FormKanwil" },
       { property: "og:description", content: "Buat, aktifkan, dan kelola form internal." },
       { property: "og:type", content: "website" },
@@ -41,8 +44,13 @@ export const Route = createFileRoute("/admin/forms/")({
 const FILTERS = [
   { key: "all", label: "Semua" },
   { key: "active", label: "Aktif" },
-  { key: "inactive", label: "Nonaktif" },
+  { key: "draft", label: "Draft" },
+  { key: "closed", label: "Ditutup" },
 ] as const;
+
+function getFormStatus(form: Form): "draft" | "active" | "closed" {
+  return form.active ? "active" : form.status === "closed" ? "closed" : "draft";
+}
 
 function FormsPage() {
   const db = useDb();
@@ -54,22 +62,25 @@ function FormsPage() {
     const q = query.trim().toLowerCase();
     return [...db.forms]
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-      .filter((f) => (filter === "all" ? true : filter === "active" ? f.active : !f.active))
+      .filter((f) => (filter === "all" ? true : getFormStatus(f) === filter))
       .filter((f) => !q || f.title.toLowerCase().includes(q) || f.code.toLowerCase().includes(q));
   }, [db.forms, query, filter]);
 
   function createForm() {
     const now = new Date().toISOString();
+    const firstPageId = uid("page");
     const form: Form = {
       id: uid("frm"),
       code: generateCode(db),
-      title: "Form tanpa judul",
+      title: "",
       description: "",
       emoji: "📝",
       active: false,
+      status: "draft",
+      pages: [{ id: firstPageId, title: "Halaman 1" }],
       createdAt: now,
       updatedAt: now,
-      questions: [{ id: uid("q"), type: "short", label: "Pertanyaan pertama", required: true }],
+      questions: [],
     };
     setDb((d) => ({ ...d, forms: [...d.forms, form] }));
     navigate({ to: "/admin/forms/$formId", params: { formId: form.id } });
@@ -78,7 +89,16 @@ function FormsPage() {
   function toggleActive(form: Form, active: boolean) {
     setDb((d) => ({
       ...d,
-      forms: d.forms.map((f) => (f.id === form.id ? { ...f, active, updatedAt: new Date().toISOString() } : f)),
+      forms: d.forms.map((f) =>
+        f.id === form.id
+          ? {
+              ...f,
+              active,
+              status: active ? "active" : "closed",
+              updatedAt: new Date().toISOString(),
+            }
+          : f,
+      ),
     }));
     toast.success(active ? `"${form.title}" sekarang aktif 🟢` : `"${form.title}" dinonaktifkan`);
   }
@@ -96,7 +116,7 @@ function FormsPage() {
     <div>
       <PageTitle
         title="Kelola Form"
-        subtitle="Bikin form, bagikan kodenya, dan pantau jawaban yang masuk."
+        subtitle="Bikin form, bagikan tautannya, dan pantau jawaban yang masuk."
         action={
           <Button size="lg" onClick={createForm}>
             <Plus /> Buat form baru
@@ -107,7 +127,12 @@ function FormsPage() {
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative flex-1">
           <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Cari judul atau kode…" className="pl-11" />
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Cari judul atau kode…"
+            className="pl-11"
+          />
         </div>
         <div className="flex gap-1 rounded-full border border-border bg-card p-1">
           {FILTERS.map((f) => (
@@ -116,7 +141,9 @@ function FormsPage() {
               onClick={() => setFilter(f.key)}
               className={cn(
                 "rounded-full px-4 py-1.5 text-sm font-semibold transition-colors",
-                filter === f.key ? "bg-gradient-brand text-primary-foreground" : "text-muted-foreground hover:bg-mint-soft",
+                filter === f.key
+                  ? "bg-gradient-brand text-primary-foreground"
+                  : "text-muted-foreground hover:bg-mint-soft",
               )}
             >
               {f.label}
@@ -129,7 +156,18 @@ function FormsPage() {
         <EmptyState
           emoji="📭"
           title={db.forms.length === 0 ? "Belum ada form" : "Tidak ada yang cocok"}
-          description={db.forms.length === 0 ? "Klik tombol di atas untuk membuat form pertama." : "Coba kata kunci atau filter lain."}
+          description={
+            db.forms.length === 0
+              ? "Belum ada form. Buat form pertama kamu!"
+              : "Coba kata kunci atau filter lain."
+          }
+          action={
+            db.forms.length === 0 ? (
+              <Button onClick={createForm}>
+                <Plus /> Buat form pertama
+              </Button>
+            ) : undefined
+          }
         />
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
@@ -138,15 +176,19 @@ function FormsPage() {
             return (
               <article key={form.id} className="card-soft card-hover flex flex-col p-5">
                 <div className="flex items-start gap-4">
-                  <div className="grid size-12 shrink-0 place-items-center rounded-2xl bg-mint-soft text-2xl">{form.emoji}</div>
+                  <div className="grid size-12 shrink-0 place-items-center rounded-2xl bg-mint-soft text-2xl">
+                    {form.emoji}
+                  </div>
                   <div className="min-w-0 flex-1">
                     <h3 className="font-display text-lg font-bold leading-snug">{form.title}</h3>
-                    <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{form.description || "Belum ada deskripsi."}</p>
+                    <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
+                      {form.description || "Belum ada deskripsi."}
+                    </p>
                   </div>
                   <Switch
                     checked={form.active}
                     onCheckedChange={(v) => toggleActive(form, v)}
-                    aria-label={form.active ? "Nonaktifkan form" : "Aktifkan form"}
+                    aria-label={form.active ? "Tutup form" : "Aktifkan form"}
                   />
                 </div>
                 <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -163,7 +205,11 @@ function FormsPage() {
                   <span className="chip">{form.questions.length} pertanyaan</span>
                   <span className="chip">{count} jawaban</span>
                   <span className={cn("chip", !form.active && "bg-muted text-muted-foreground")}>
-                    {form.active ? "🟢 Aktif" : "⚪ Nonaktif"}
+                    {form.active
+                      ? "🟢 Aktif"
+                      : form.status === "closed"
+                        ? "⚫ Ditutup"
+                        : "⚪ Draft"}
                   </span>
                 </div>
                 <div className="mt-5 flex flex-wrap gap-2 border-t border-border pt-4">
@@ -179,7 +225,11 @@ function FormsPage() {
                   </Button>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
-                      <Button variant="ghost" size="sm" className="ml-auto hover:bg-destructive-soft hover:text-destructive-foreground">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="ml-auto hover:bg-destructive-soft hover:text-destructive-foreground"
+                      >
                         <Trash2 /> Hapus
                       </Button>
                     </AlertDialogTrigger>

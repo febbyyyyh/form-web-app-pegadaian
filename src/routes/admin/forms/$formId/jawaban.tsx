@@ -2,25 +2,36 @@ import { useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { format } from "date-fns";
 import { id as localeId } from "date-fns/locale";
-import { ArrowLeft, Download, Pencil, Percent, Star, Users } from "lucide-react";
-import { Bar, BarChart, Cell, Pie, PieChart, XAxis, YAxis } from "recharts";
+import { ArrowLeft, Download, Pencil, Star, Users, X } from "lucide-react";
+import { Bar, BarChart, Cell, XAxis, YAxis } from "recharts";
 import { toast } from "sonner";
 
 import { EmptyState } from "@/components/fk/States";
 import { StatCard } from "@/components/fk/StatCard";
 import { Button } from "@/components/ui/button";
-import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from "@/components/ui/chart";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { formatAnswer, responsesToCsv, summarizeQuestion, RATING_MAX } from "@/lib/formkanwil/logic";
+import {
+  formatAnswer,
+  responsesToCsv,
+  summarizeQuestion,
+  RATING_MAX,
+} from "@/lib/formkanwil/logic";
 import { useDb } from "@/lib/formkanwil/store";
 import { QUESTION_TYPE_LABEL, type FormResponse } from "@/lib/formkanwil/types";
 
@@ -38,25 +49,38 @@ export const Route = createFileRoute("/admin/forms/$formId/jawaban")({
   component: ResponsesPage,
 });
 
-const PALETTE = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)", "var(--chart-5)"];
+const PALETTE = [
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
+];
 const barConfig = { count: { label: "Jawaban", color: "var(--chart-1)" } } satisfies ChartConfig;
 
 function ResponsesPage() {
   const { formId } = Route.useParams();
   const db = useDb();
   const form = db.forms.find((f) => f.id === formId);
-  const [unit, setUnit] = useState("all");
   const [selected, setSelected] = useState<FormResponse | null>(null);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
 
-  const responses = useMemo(
-    () =>
-      db.responses
-        .filter((r) => r.formId === formId)
-        .sort((a, b) => b.submittedAt.localeCompare(a.submittedAt)),
-    [db.responses, formId],
-  );
-  const userOf = (id: string) => db.users.find((u) => u.id === id);
-  const filtered = unit === "all" ? responses : responses.filter((r) => userOf(r.userId)?.unit === unit);
+  const responses = useMemo(() => {
+    const from = dateFrom ? new Date(`${dateFrom}T00:00:00`) : null;
+    const to = dateTo ? new Date(`${dateTo}T23:59:59.999`) : null;
+    return db.responses
+      .filter((response) => {
+        if (response.formId !== formId) return false;
+        const submittedAt = new Date(response.submittedAt);
+        if (from && submittedAt < from) return false;
+        if (to && submittedAt > to) return false;
+        return true;
+      })
+      .sort((a, b) => b.submittedAt.localeCompare(a.submittedAt));
+  }, [db.responses, formId, dateFrom, dateTo]);
+  const invalidDateRange = Boolean(dateFrom && dateTo && dateFrom > dateTo);
+  const userOf = (id: string | null) => (id ? db.users.find((u) => u.id === id) : undefined);
 
   if (!form) {
     return (
@@ -72,16 +96,12 @@ function ResponsesPage() {
     );
   }
 
-  const members = db.users.filter((u) => u.role === "user").length;
   const ratingQ = form.questions.find((q) => q.type === "rating");
-  const ratingSummary = ratingQ ? summarizeQuestion(ratingQ, filtered) : null;
-  const perUnit = db.units
-    .map((u) => ({ unit: u, count: responses.filter((r) => userOf(r.userId)?.unit === u).length }))
-    .filter((x) => x.count > 0);
+  const ratingSummary = ratingQ ? summarizeQuestion(ratingQ, responses) : null;
 
   function exportCsv() {
     if (!form) return;
-    const csv = responsesToCsv(form, filtered, db.users);
+    const csv = responsesToCsv(form, responses, db.users);
     const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -89,7 +109,7 @@ function ResponsesPage() {
     a.download = `${form.code}-jawaban-${format(new Date(), "yyyyMMdd")}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-    toast.success(`${filtered.length} jawaban diekspor 📥`);
+    toast.success(`${responses.length} jawaban diekspor 📥`);
   }
 
   return (
@@ -106,100 +126,134 @@ function ResponsesPage() {
               <Pencil /> Edit form
             </Link>
           </Button>
-          <Button size="sm" onClick={exportCsv} disabled={filtered.length === 0}>
+          <Button size="sm" onClick={exportCsv} disabled={responses.length === 0}>
             <Download /> Export CSV
           </Button>
         </div>
       </div>
 
       <section className="card-soft flex flex-wrap items-center gap-4 p-6">
-        <div className="grid size-14 place-items-center rounded-2xl bg-mint-soft text-3xl">{form.emoji}</div>
+        <div className="grid size-14 place-items-center rounded-2xl bg-mint-soft text-3xl">
+          {form.emoji}
+        </div>
         <div className="min-w-0 flex-1">
-          <h1 className="font-display text-2xl font-extrabold tracking-tight sm:text-3xl">{form.title}</h1>
+          <h1 className="font-display text-2xl font-extrabold tracking-tight sm:text-3xl">
+            {form.title}
+          </h1>
           <div className="mt-2 flex flex-wrap gap-2">
             <span className="chip font-mono">Kode: {form.code}</span>
-            <span className="chip">{form.active ? "🟢 Aktif" : "⚪ Nonaktif"}</span>
+            <span className="chip">
+              {form.active ? "🟢 Aktif" : form.status === "closed" ? "⚫ Ditutup" : "⚪ Draft"}
+            </span>
           </div>
         </div>
       </section>
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <StatCard icon={Users} label="Jawaban masuk" value={responses.length} hint={unit !== "all" ? `${filtered.length} dari unit ${unit}` : undefined} />
-        <StatCard icon={Percent} label="Tingkat partisipasi" value={`${members ? Math.round((responses.length / members) * 100) : 0}%`} tone="violet" hint={`dari ${members} pengguna`} />
+      <section className="card-soft grid gap-3 p-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+        <div className="space-y-1.5">
+          <label htmlFor="response-date-from" className="text-sm font-medium">
+            Dari tanggal
+          </label>
+          <Input
+            id="response-date-from"
+            type="date"
+            value={dateFrom}
+            onChange={(event) => {
+              setDateFrom(event.target.value);
+              setSelected(null);
+            }}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <label htmlFor="response-date-to" className="text-sm font-medium">
+            Sampai tanggal
+          </label>
+          <Input
+            id="response-date-to"
+            type="date"
+            value={dateTo}
+            onChange={(event) => {
+              setDateTo(event.target.value);
+              setSelected(null);
+            }}
+          />
+        </div>
+        {(dateFrom || dateTo) && (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              setDateFrom("");
+              setDateTo("");
+              setSelected(null);
+            }}
+          >
+            <X /> Hapus filter
+          </Button>
+        )}
+        {invalidDateRange && (
+          <p role="alert" className="text-sm text-destructive-foreground sm:col-span-3">
+            Tanggal awal tidak boleh melewati tanggal akhir.
+          </p>
+        )}
+      </section>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <StatCard icon={Users} label="Jawaban masuk" value={responses.length} />
         <StatCard
           icon={Star}
           label="Rata-rata rating"
-          value={ratingSummary && ratingSummary.kind === "rating" && ratingSummary.total ? `${ratingSummary.average.toFixed(1)} / ${RATING_MAX}` : "—"}
+          value={
+            ratingSummary && ratingSummary.kind === "rating" && ratingSummary.total
+              ? `${ratingSummary.average.toFixed(1)} / ${RATING_MAX}`
+              : "—"
+          }
           tone="gold"
           hint={ratingQ ? ratingQ.label : "Tidak ada pertanyaan rating"}
         />
       </div>
 
       {responses.length === 0 ? (
-        <EmptyState emoji="📭" title="Belum ada jawaban" description={`Bagikan kode ${form.code} ke peserta supaya jawaban mulai masuk.`} />
+        <EmptyState
+          emoji="📭"
+          title={dateFrom || dateTo ? "Tidak ada jawaban pada rentang ini" : "Belum ada jawaban"}
+          description={
+            dateFrom || dateTo
+              ? "Coba ubah rentang tanggal, atau hapus filternya."
+              : "Aktifkan form lalu bagikan tautan kepada responden."
+          }
+        />
       ) : (
         <Tabs defaultValue="ringkasan">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <TabsList className="h-auto rounded-full bg-card p-1 shadow-card">
-              <TabsTrigger value="ringkasan" className="rounded-full px-4 py-1.5 data-[state=active]:bg-mint-soft data-[state=active]:text-mint-foreground">
+              <TabsTrigger
+                value="ringkasan"
+                className="rounded-full px-4 py-1.5 data-[state=active]:bg-mint-soft data-[state=active]:text-mint-foreground"
+              >
                 Ringkasan
               </TabsTrigger>
-              <TabsTrigger value="semua" className="rounded-full px-4 py-1.5 data-[state=active]:bg-mint-soft data-[state=active]:text-mint-foreground">
+              <TabsTrigger
+                value="semua"
+                className="rounded-full px-4 py-1.5 data-[state=active]:bg-mint-soft data-[state=active]:text-mint-foreground"
+              >
                 Semua jawaban
               </TabsTrigger>
             </TabsList>
-            <Select value={unit} onValueChange={setUnit}>
-              <SelectTrigger className="w-52 bg-card" aria-label="Filter unit">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Semua unit</SelectItem>
-                {db.units.map((u) => (
-                  <SelectItem key={u} value={u}>
-                    {u}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
 
           <TabsContent value="ringkasan" className="mt-5 space-y-4">
-            {unit === "all" && perUnit.length > 0 && (
-              <section className="card-soft p-5">
-                <h3 className="font-display font-bold">Sebaran per unit</h3>
-                <div className="mt-2 flex flex-wrap items-center gap-6">
-                  <ChartContainer config={barConfig} className="h-44 w-44">
-                    <PieChart>
-                      <ChartTooltip content={<ChartTooltipContent nameKey="unit" hideLabel />} />
-                      <Pie data={perUnit} dataKey="count" nameKey="unit" innerRadius={40} outerRadius={70} paddingAngle={3}>
-                        {perUnit.map((_, i) => (
-                          <Cell key={i} fill={PALETTE[i % PALETTE.length]} />
-                        ))}
-                      </Pie>
-                    </PieChart>
-                  </ChartContainer>
-                  <ul className="grid gap-1.5 text-sm">
-                    {perUnit.map((p, i) => (
-                      <li key={p.unit} className="flex items-center gap-2">
-                        <span className="size-3 rounded-full" style={{ background: PALETTE[i % PALETTE.length] }} />
-                        <span className="font-medium">{p.unit}</span>
-                        <span className="text-muted-foreground">· {p.count}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </section>
-            )}
-
             {form.questions.map((q, i) => {
-              const s = summarizeQuestion(q, filtered);
+              const s = summarizeQuestion(q, responses);
               return (
                 <section key={q.id} className="card-soft p-5">
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <h3 className="font-display font-bold">
                       {i + 1}. {q.label}
                     </h3>
-                    <span className="chip">{QUESTION_TYPE_LABEL[q.type]} · {s.total} jawaban</span>
+                    <span className="chip">
+                      {QUESTION_TYPE_LABEL[q.type]} · {s.total} jawaban
+                    </span>
                   </div>
                   {s.kind === "text" ? (
                     s.samples.length === 0 ? (
@@ -217,17 +271,39 @@ function ResponsesPage() {
                     <>
                       {s.kind === "rating" && s.total > 0 && (
                         <div className="mt-2 flex items-center gap-2 text-sm font-semibold text-gold-foreground">
-                          <Star className="size-4 fill-gold text-gold" /> Rata-rata {s.average.toFixed(1)}
+                          <Star className="size-4 fill-gold text-gold" /> Rata-rata{" "}
+                          {s.average.toFixed(1)}
                         </div>
                       )}
-                      <ChartContainer config={barConfig} className="mt-3 w-full" style={{ height: Math.max(120, s.counts.length * 40) }}>
+                      <ChartContainer
+                        config={barConfig}
+                        className="mt-3 w-full"
+                        style={{ height: Math.max(120, s.counts.length * 40) }}
+                      >
                         <BarChart data={s.counts} layout="vertical" margin={{ left: 0, right: 24 }}>
                           <XAxis type="number" hide allowDecimals={false} />
-                          <YAxis type="category" dataKey="option" tickLine={false} axisLine={false} width={150} />
+                          <YAxis
+                            type="category"
+                            dataKey="option"
+                            tickLine={false}
+                            axisLine={false}
+                            width={150}
+                          />
                           <ChartTooltip content={<ChartTooltipContent />} />
-                          <Bar dataKey="count" radius={8} label={{ position: "right", fill: "var(--muted-foreground)", fontSize: 12 }}>
+                          <Bar
+                            dataKey="count"
+                            radius={8}
+                            label={{
+                              position: "right",
+                              fill: "var(--muted-foreground)",
+                              fontSize: 12,
+                            }}
+                          >
                             {s.counts.map((_, k) => (
-                              <Cell key={k} fill={s.kind === "rating" ? "var(--chart-3)" : PALETTE[k % 4]} />
+                              <Cell
+                                key={k}
+                                fill={s.kind === "rating" ? "var(--chart-3)" : PALETTE[k % 4]}
+                              />
                             ))}
                           </Bar>
                         </BarChart>
@@ -240,34 +316,47 @@ function ResponsesPage() {
           </TabsContent>
 
           <TabsContent value="semua" className="mt-5">
-            {filtered.length === 0 ? (
-              <EmptyState emoji="🙈" title="Tidak ada jawaban dari unit ini" />
+            {responses.length === 0 ? (
+              <EmptyState emoji="🙈" title="Tidak ada jawaban" />
             ) : (
               <div className="card-soft overflow-hidden">
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-mint-soft/60 hover:bg-mint-soft/60">
+                      <TableHead>ID jawaban</TableHead>
                       <TableHead>Nama</TableHead>
-                      <TableHead>Unit</TableHead>
                       <TableHead>Waktu</TableHead>
-                      <TableHead className="hidden md:table-cell">{form.questions[0]?.label}</TableHead>
+                      <TableHead className="hidden md:table-cell">
+                        {form.questions[0]?.label}
+                      </TableHead>
                       <TableHead className="text-right">Detail</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filtered.map((r) => {
+                    {responses.map((r) => {
                       const u = userOf(r.userId);
                       return (
-                        <TableRow key={r.id} className="cursor-pointer hover:bg-mint-soft/40" onClick={() => setSelected(r)}>
-                          <TableCell className="font-semibold">{u?.name ?? "(akun dihapus)"}</TableCell>
-                          <TableCell>
-                            <span className="chip">{u?.unit ?? "-"}</span>
+                        <TableRow
+                          key={r.id}
+                          className="cursor-pointer hover:bg-mint-soft/40"
+                          onClick={() => setSelected(r)}
+                        >
+                          <TableCell
+                            className="whitespace-nowrap font-mono text-xs text-muted-foreground"
+                            title={r.id}
+                          >
+                            {r.id}
+                          </TableCell>
+                          <TableCell className="font-semibold">
+                            {u?.name ?? "Responden anonim"}
                           </TableCell>
                           <TableCell className="text-muted-foreground">
                             {format(new Date(r.submittedAt), "d MMM, HH:mm", { locale: localeId })}
                           </TableCell>
                           <TableCell className="hidden max-w-[240px] truncate md:table-cell">
-                            {form.questions[0] ? formatAnswer(form.questions[0], r.answers[form.questions[0].id]) : ""}
+                            {form.questions[0]
+                              ? formatAnswer(form.questions[0], r.answers[form.questions[0].id])
+                              : ""}
                           </TableCell>
                           <TableCell className="text-right">
                             <Button variant="ghost" size="sm">
@@ -290,10 +379,14 @@ function ResponsesPage() {
           {selected && (
             <>
               <DialogHeader>
-                <DialogTitle className="font-display text-xl">{userOf(selected.userId)?.name ?? "Jawaban"}</DialogTitle>
+                <DialogTitle className="font-display text-xl">
+                  {userOf(selected.userId)?.name ?? "Responden anonim"}
+                </DialogTitle>
+                <p className="font-mono text-xs text-muted-foreground">{selected.id}</p>
                 <p className="text-sm text-muted-foreground">
-                  {userOf(selected.userId)?.unit} ·{" "}
-                  {format(new Date(selected.submittedAt), "d MMMM yyyy, HH:mm", { locale: localeId })}
+                  {format(new Date(selected.submittedAt), "d MMMM yyyy, HH:mm", {
+                    locale: localeId,
+                  })}
                 </p>
               </DialogHeader>
               <dl className="space-y-3">
@@ -303,7 +396,9 @@ function ResponsesPage() {
                       {i + 1}. {q.label}
                     </dt>
                     <dd className="mt-1 text-sm font-medium">
-                      {formatAnswer(q, selected.answers[q.id]) || <span className="italic text-muted-foreground">Tidak dijawab</span>}
+                      {formatAnswer(q, selected.answers[q.id]) || (
+                        <span className="italic text-muted-foreground">Tidak dijawab</span>
+                      )}
                     </dd>
                   </div>
                 ))}
