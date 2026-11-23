@@ -1,24 +1,43 @@
-# Pixel Perfect Replica
+# FormKanwil
 
-Implement exactly the screenshot and nothing else
+Portal formulir digital untuk membantu administrator Kanwil Pegadaian membuat dan mengelola form, lalu meninjau jawaban yang dikirim responden.
 
-This project was built with [Lovable](https://lovable.dev).
+## Fitur
 
-## Build with Lovable
+- **Dashboard admin** untuk melihat ringkasan form dan jawaban, beserta visualisasi respons.
+- **Pengelolaan form** untuk membuat, mengedit, mengaktifkan, mencari, dan menutup form.
+- **Beragam jenis pertanyaan**, termasuk jawaban singkat, paragraf, pilihan, rating, angka, dan tanggal.
+- **Akses responden dengan kode** tanpa perlu masuk ke akun admin.
+- **Peninjauan jawaban** berdasarkan form dan rentang tanggal.
+- **Data demo tersimpan di browser** menggunakan `localStorage`; aplikasi dapat dicoba tanpa backend.
 
-Continue developing this project in the [Lovable editor](https://lovable.dev/projects/7fa4e383-3f99-4ec6-be05-4dbc85ca660d).
+> **Catatan:** data hanya tersimpan di browser yang digunakan dan tidak dibagikan antarperangkat. Aplikasi ini merupakan demo, bukan sistem produksi untuk menyimpan data sensitif.
 
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: every change made in Lovable is committed straight to this repository.
-- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
+## Menjalankan secara lokal
 
-## Development
-
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
+Pastikan Node.js dan npm sudah terpasang, lalu jalankan:
 
 ```sh
-git clone <this-repository-url>
-cd <repository-name>
-npm i
+git clone https://github.com/febbyyyyh/form-web-app-pegadaian.git
+cd form-web-app-pegadaian
+npm install
 npm run dev
 ```
+
+Buka URL lokal yang ditampilkan oleh Vite di terminal.
+
+## Perintah yang tersedia
+
+```sh
+npm run dev     # Menjalankan server pengembangan
+npm test        # Menjalankan test
+npm run build   # Membuat build produksi
+```
+
+## Teknologi
+
+- React dan TypeScript
+- TanStack Start dan TanStack Router
+- Vite
+- Tailwind CSS
+- Recharts
