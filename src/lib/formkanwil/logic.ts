@@ -191,6 +191,12 @@ function csvCell(value: string): string {
 }
 
 export function responsesToCsv(form: Form, responses: FormResponse[], users: User[]): string {
+  return responsesToRows(form, responses, users)
+    .map((row) => row.map(csvCell).join(","))
+    .join("\r\n");
+}
+
+export function responsesToRows(form: Form, responses: FormResponse[], users: User[]): string[][] {
   const header = ["ID jawaban", "Waktu", "Nama responden", ...form.questions.map((q) => q.label)];
   const rows = responses.map((r) => {
     const u = r.userId ? users.find((x) => x.id === r.userId) : undefined;
@@ -201,7 +207,7 @@ export function responsesToCsv(form: Form, responses: FormResponse[], users: Use
       ...form.questions.map((q) => formatAnswer(q, r.answers[q.id])),
     ];
   });
-  return [header, ...rows].map((row) => row.map(csvCell).join(",")).join("\r\n");
+  return [header, ...rows];
 }
 
 export interface ChoiceSummary {

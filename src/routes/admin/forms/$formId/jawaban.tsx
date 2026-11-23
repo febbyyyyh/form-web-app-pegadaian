@@ -2,7 +2,17 @@ import { useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { format } from "date-fns";
 import { id as localeId } from "date-fns/locale";
-import { ArrowLeft, Download, Pencil, Star, Users, X } from "lucide-react";
+import {
+  ArrowLeft,
+  ChevronDown,
+  Download,
+  Eye,
+  FileText,
+  Pencil,
+  Star,
+  Users,
+  X,
+} from "lucide-react";
 import { Bar, BarChart, Cell, XAxis, YAxis } from "recharts";
 import { toast } from "sonner";
 
@@ -15,7 +25,19 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import {
   Table,
@@ -29,6 +51,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   formatAnswer,
   responsesToCsv,
+  responsesToRows,
   summarizeQuestion,
   RATING_MAX,
 } from "@/lib/formkanwil/logic";
@@ -39,9 +62,12 @@ export const Route = createFileRoute("/admin/forms/$formId/jawaban")({
   head: () => ({
     meta: [
       { title: "Jawaban & Statistik — FormKanwil" },
-      { name: "description", content: "Rekap jawaban, statistik per pertanyaan, dan ekspor CSV." },
+      {
+        name: "description",
+        content: "Rekap jawaban, statistik per pertanyaan, pratinjau CSV, dan ekspor CSV atau PDF.",
+      },
       { property: "og:title", content: "Jawaban & Statistik — FormKanwil" },
-      { property: "og:description", content: "Rekap jawaban dan ekspor CSV." },
+      { property: "og:description", content: "Rekap jawaban dan ekspor CSV atau PDF." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -63,6 +89,7 @@ function ResponsesPage() {
   const db = useDb();
   const form = db.forms.find((f) => f.id === formId);
   const [selected, setSelected] = useState<FormResponse | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
 
@@ -79,6 +106,10 @@ function ResponsesPage() {
       })
       .sort((a, b) => b.submittedAt.localeCompare(a.submittedAt));
   }, [db.responses, formId, dateFrom, dateTo]);
+  const exportRows = useMemo(
+    () => (form ? responsesToRows(form, responses, db.users) : []),
+    [form, responses, db.users],
+  );
   const invalidDateRange = Boolean(dateFrom && dateTo && dateFrom > dateTo);
   const userOf = (id: string | null) => (id ? db.users.find((u) => u.id === id) : undefined);
 
@@ -100,7 +131,6 @@ function ResponsesPage() {
   const ratingSummary = ratingQ ? summarizeQuestion(ratingQ, responses) : null;
 
   function exportCsv() {
-    if (!form) return;
     const csv = responsesToCsv(form, responses, db.users);
     const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -112,6 +142,41 @@ function ResponsesPage() {
     toast.success(`${responses.length} jawaban diekspor 📥`);
   }
 
+  async function exportPdf() {
+    try {
+      const [{ jsPDF }, { default: autoTable }] = await Promise.all([
+        import("jspdf"),
+        import("jspdf-autotable"),
+      ]);
+      const [header = [], ...rows] = exportRows;
+      const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
+      const pageWidth = doc.internal.pageSize.getWidth();
+      doc.setFontSize(14);
+      const titleLines = doc.splitTextToSize(form.title, pageWidth - 60);
+      doc.text(titleLines, 30, 30);
+      doc.setFontSize(9);
+      const subtitleY = 30 + titleLines.length * 17;
+      doc.text(
+        `Kode: ${form.code} - ${responses.length} jawaban - diekspor ${format(new Date(), "d MMMM yyyy HH:mm", { locale: localeId })}`,
+        30,
+        subtitleY,
+      );
+      autoTable(doc, {
+        head: [header],
+        body: rows,
+        startY: subtitleY + 12,
+        margin: 30,
+        styles: { fontSize: 7, cellPadding: 3, overflow: "linebreak" },
+        headStyles: { fillColor: [14, 159, 110] },
+      });
+      doc.save(`${form.code}-jawaban-${format(new Date(), "yyyyMMdd")}.pdf`);
+      toast.success(`${responses.length} jawaban diekspor 📥`);
+    } catch (error) {
+      console.error("Gagal mengekspor jawaban ke PDF.", error);
+      toast.error("PDF gagal dibuat. Coba lagi.");
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -120,15 +185,35 @@ function ResponsesPage() {
             <ArrowLeft /> Semua form
           </Link>
         </Button>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button asChild variant="brandOutline" size="sm">
             <Link to="/admin/forms/$formId" params={{ formId: form.id }}>
               <Pencil /> Edit form
             </Link>
           </Button>
-          <Button size="sm" onClick={exportCsv} disabled={responses.length === 0}>
-            <Download /> Export CSV
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setPreviewOpen(true)}
+            disabled={responses.length === 0}
+          >
+            <Eye /> Preview CSV
           </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" disabled={responses.length === 0}>
+                <Download /> Unduh data <ChevronDown />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={exportCsv}>
+                <FileText /> Unduh CSV
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => void exportPdf()}>
+                <FileText /> Unduh PDF
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -405,6 +490,48 @@ function ResponsesPage() {
               </dl>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+        <DialogContent className="max-h-[90vh] max-w-6xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="font-display text-xl">Preview data CSV</DialogTitle>
+            <DialogDescription>
+              Data yang sama akan digunakan saat mengunduh CSV atau PDF, termasuk filter tanggal
+              yang sedang dipilih.
+            </DialogDescription>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Menampilkan {Math.min(responses.length, 20)} dari {responses.length} jawaban.
+          </p>
+          <div className="max-h-[60vh] overflow-auto rounded-xl border">
+            <Table className="min-w-max">
+              <TableHeader>
+                <TableRow className="bg-mint-soft/60 hover:bg-mint-soft/60">
+                  {(exportRows[0] ?? []).map((heading, index) => (
+                    <TableHead key={`${heading}-${index}`} className="whitespace-nowrap">
+                      {heading}
+                    </TableHead>
+                  ))}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {exportRows.slice(1, 21).map((row, rowIndex) => (
+                  <TableRow key={rowIndex}>
+                    {row.map((value, columnIndex) => (
+                      <TableCell
+                        key={`${rowIndex}-${columnIndex}`}
+                        className="max-w-xs whitespace-pre-wrap align-top"
+                      >
+                        {value || <span className="text-muted-foreground">—</span>}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

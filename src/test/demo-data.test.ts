@@ -6,6 +6,7 @@ import {
   getFormPages,
   getPageQuestions,
   responsesToCsv,
+  responsesToRows,
   submitResponse,
 } from "@/lib/formkanwil/logic";
 import { createInitialDatabase } from "@/lib/formkanwil/seed";
@@ -98,6 +99,32 @@ describe("FormKanwil initial data", () => {
     expect(csv.split("\r\n")[0]).toBe("ID jawaban,Waktu,Nama responden,Nama");
     expect(csv).toContain("response-1");
     expect(csv).toContain(`"'=SUM(1,1)"`);
+  });
+
+  it("provides unescaped response rows for previews and other export formats", () => {
+    const form: Form = {
+      id: "form-1",
+      code: "FORM1",
+      title: "Form",
+      description: "",
+      emoji: "📝",
+      active: true,
+      questions: [{ id: "question-1", type: "short", label: "Nama", required: false }],
+      createdAt: new Date(0).toISOString(),
+      updatedAt: new Date(0).toISOString(),
+    };
+    const response: FormResponse = {
+      id: "response-1",
+      formId: form.id,
+      userId: null,
+      answers: { "question-1": "=SUM(1,1)" },
+      submittedAt: new Date(0).toISOString(),
+    };
+
+    expect(responsesToRows(form, [response], [])).toEqual([
+      ["ID jawaban", "Waktu", "Nama responden", "Nama"],
+      ["response-1", expect.any(String), "Responden anonim", "=SUM(1,1)"],
+    ]);
   });
 
   it("creates a code-prefilled public share link", () => {
