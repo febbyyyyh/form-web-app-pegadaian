@@ -111,23 +111,46 @@ export function validateAnswers(form: Form, answers: Answers): Record<string, st
   return errors;
 }
 
+export interface RespondentIdentity {
+  name: string;
+  email: string;
+}
+
+export function validateRespondentIdentity(identity: RespondentIdentity): Record<string, string> {
+  const errors: Record<string, string> = {};
+  const name = identity.name.trim();
+  const email = identity.email.trim();
+
+  if (!name) errors.respondentName = "Nama lengkap wajib diisi.";
+  if (!email) errors.respondentEmail = "Email wajib diisi.";
+  else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+    errors.respondentEmail = "Masukkan alamat email yang valid.";
+
+  return errors;
+}
+
 export type SubmitResult =
   | { ok: true; db: Database; response: FormResponse }
   | { ok: false; reason: "inactive" | "invalid"; errors?: Record<string, string> };
 
 export function submitResponse(
   db: Database,
-  params: { formId: string; answers: Answers },
+  params: { formId: string; answers: Answers; respondent: RespondentIdentity },
   now = new Date(),
 ): SubmitResult {
   const form = db.forms.find((f) => f.id === params.formId);
   if (!form || !form.active) return { ok: false, reason: "inactive" };
-  const errors = validateAnswers(form, params.answers);
+  const errors = {
+    ...validateRespondentIdentity(params.respondent),
+    ...validateAnswers(form, params.answers),
+  };
   if (Object.keys(errors).length > 0) return { ok: false, reason: "invalid", errors };
   const response: FormResponse = {
     id: uid("rsp"),
     formId: form.id,
     userId: null,
+    respondentName: params.respondent.name.trim(),
+    respondentEmail: params.respondent.email.trim(),
     answers: params.answers,
     submittedAt: now.toISOString(),
   };
@@ -183,6 +206,16 @@ export function formatAnswer(question: Question, value: AnswerValue | undefined)
   return String(value);
 }
 
+export function getRespondentName(response: FormResponse, users: User[]): string {
+  const user = response.userId ? users.find((item) => item.id === response.userId) : undefined;
+  return response.respondentName.trim() || user?.name || "Identitas tidak tersedia (data lama)";
+}
+
+export function getRespondentEmail(response: FormResponse, users: User[]): string {
+  const user = response.userId ? users.find((item) => item.id === response.userId) : undefined;
+  return response.respondentEmail.trim() || user?.email || "";
+}
+
 function csvCell(value: string): string {
   const isNumeric = /^-?(?:\d+(?:\.\d+)?|\.\d+)$/.test(value);
   const safeValue = /^[\t\r ]*[=+\-@]/.test(value) && !isNumeric ? `'${value}` : value;
@@ -197,13 +230,19 @@ export function responsesToCsv(form: Form, responses: FormResponse[], users: Use
 }
 
 export function responsesToRows(form: Form, responses: FormResponse[], users: User[]): string[][] {
-  const header = ["ID jawaban", "Waktu", "Nama responden", ...form.questions.map((q) => q.label)];
+  const header = [
+    "ID jawaban",
+    "Waktu",
+    "Nama responden",
+    "Email",
+    ...form.questions.map((q) => q.label),
+  ];
   const rows = responses.map((r) => {
-    const u = r.userId ? users.find((x) => x.id === r.userId) : undefined;
     return [
       r.id,
       new Date(r.submittedAt).toLocaleString("id-ID"),
-      u?.name ?? "Responden anonim",
+      getRespondentName(r, users),
+      getRespondentEmail(r, users),
       ...form.questions.map((q) => formatAnswer(q, r.answers[q.id])),
     ];
   });

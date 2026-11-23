@@ -51,6 +51,8 @@ export interface FormResponse {
   id: string;
   formId: string;
   userId: string | null;
+  respondentName: string;
+  respondentEmail: string;
   answers: Answers;
   submittedAt: string;
 }

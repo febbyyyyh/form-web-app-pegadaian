@@ -8,6 +8,7 @@ import {
   responsesToCsv,
   responsesToRows,
   submitResponse,
+  validateRespondentIdentity,
 } from "@/lib/formkanwil/logic";
 import { createInitialDatabase } from "@/lib/formkanwil/seed";
 import type { Database, Form, FormResponse } from "@/lib/formkanwil/types";
@@ -66,12 +67,14 @@ describe("FormKanwil initial data", () => {
       id: "response-1",
       formId: form.id,
       userId: admin.id,
+      respondentName: admin.name,
+      respondentEmail: admin.email,
       answers: {},
       submittedAt: new Date(0).toISOString(),
     };
 
     expect(responsesToCsv(form, [response], [admin]).split("\r\n")[0]).toBe(
-      "ID jawaban,Waktu,Nama responden",
+      "ID jawaban,Waktu,Nama responden,Email",
     );
   });
 
@@ -91,13 +94,16 @@ describe("FormKanwil initial data", () => {
       id: "response-1",
       formId: form.id,
       userId: null,
+      respondentName: "Rina",
+      respondentEmail: "rina@example.com",
       answers: { "question-1": "=SUM(1,1)" },
       submittedAt: new Date(0).toISOString(),
     };
     const csv = responsesToCsv(form, [response], []);
 
-    expect(csv.split("\r\n")[0]).toBe("ID jawaban,Waktu,Nama responden,Nama");
+    expect(csv.split("\r\n")[0]).toBe("ID jawaban,Waktu,Nama responden,Email,Nama");
     expect(csv).toContain("response-1");
+    expect(csv).toContain("Rina,rina@example.com");
     expect(csv).toContain(`"'=SUM(1,1)"`);
   });
 
@@ -117,14 +123,27 @@ describe("FormKanwil initial data", () => {
       id: "response-1",
       formId: form.id,
       userId: null,
+      respondentName: "Rina",
+      respondentEmail: "rina@example.com",
       answers: { "question-1": "=SUM(1,1)" },
       submittedAt: new Date(0).toISOString(),
     };
 
     expect(responsesToRows(form, [response], [])).toEqual([
-      ["ID jawaban", "Waktu", "Nama responden", "Nama"],
-      ["response-1", expect.any(String), "Responden anonim", "=SUM(1,1)"],
+      ["ID jawaban", "Waktu", "Nama responden", "Email", "Nama"],
+      ["response-1", expect.any(String), "Rina", "rina@example.com", "=SUM(1,1)"],
     ]);
+  });
+
+  it("requires a respondent name and a valid email address", () => {
+    expect(validateRespondentIdentity({ name: "  ", email: "" })).toEqual({
+      respondentName: "Nama lengkap wajib diisi.",
+      respondentEmail: "Email wajib diisi.",
+    });
+    expect(validateRespondentIdentity({ name: "Rina", email: "not-an-email" })).toEqual({
+      respondentEmail: "Masukkan alamat email yang valid.",
+    });
+    expect(validateRespondentIdentity({ name: " Rina ", email: " rina@example.com " })).toEqual({});
   });
 
   it("creates a code-prefilled public share link", () => {
@@ -133,7 +152,7 @@ describe("FormKanwil initial data", () => {
     );
   });
 
-  it("accepts multiple anonymous responses for the same form", () => {
+  it("requires and stores respondent identity on every submitted response", () => {
     const form: Form = {
       id: "form-1",
       code: "FORM1",
@@ -146,13 +165,36 @@ describe("FormKanwil initial data", () => {
       updatedAt: new Date(0).toISOString(),
     };
     const database: Database = { users: [], forms: [form], responses: [] };
-    const first = submitResponse(database, { formId: form.id, answers: {} });
-    if (!first.ok) throw new Error("Expected the first anonymous response to be accepted");
-    const second = submitResponse(first.db, { formId: form.id, answers: {} });
+    const missingIdentity = submitResponse(database, {
+      formId: form.id,
+      answers: {},
+      respondent: { name: "", email: "" },
+    });
+    expect(missingIdentity).toMatchObject({
+      ok: false,
+      reason: "invalid",
+      errors: {
+        respondentName: "Nama lengkap wajib diisi.",
+        respondentEmail: "Email wajib diisi.",
+      },
+    });
+
+    const respondent = { name: " Rina ", email: " rina@example.com " };
+    const first = submitResponse(database, { formId: form.id, answers: {}, respondent });
+    if (!first.ok) throw new Error("Expected the first identified response to be accepted");
+    const second = submitResponse(first.db, {
+      formId: form.id,
+      answers: {},
+      respondent,
+    });
 
     expect(second.ok).toBe(true);
     if (second.ok) {
       expect(second.response.userId).toBeNull();
+      expect(second.response).toMatchObject({
+        respondentName: "Rina",
+        respondentEmail: "rina@example.com",
+      });
       expect(second.db.responses).toHaveLength(2);
     }
   });
@@ -190,7 +232,7 @@ describe("FormKanwil initial data", () => {
     try {
       const { getDb } = await import("@/lib/formkanwil/store");
       const restored = getDb();
-      const persisted = JSON.parse(localStorage.getItem("formkanwil:db:v5") ?? "null") as Database;
+      const persisted = JSON.parse(localStorage.getItem("formkanwil:db:v6") ?? "null") as Database;
 
       expect(restored.users.filter((user) => user.role === "admin").map((user) => user.id)).toEqual(
         [admin.id],
@@ -198,6 +240,61 @@ describe("FormKanwil initial data", () => {
       expect(persisted).toEqual(restored);
     } finally {
       localStorage.removeItem("formkanwil:db:v5");
+      localStorage.removeItem("formkanwil:db:v6");
+    }
+  });
+
+  it("marks legacy responses without identity during browser data migration", async () => {
+    const database = createInitialDatabase();
+    const admin = database.users[0];
+    if (!admin) throw new Error("Expected an initial admin account");
+    const form: Form = {
+      id: "form-legacy",
+      code: "LEGACY",
+      title: "Form lama",
+      description: "",
+      emoji: "📝",
+      active: true,
+      questions: [],
+      createdAt: new Date(0).toISOString(),
+      updatedAt: new Date(0).toISOString(),
+    };
+    const legacyDatabase = {
+      ...database,
+      forms: [form],
+      responses: [
+        {
+          id: "response-legacy",
+          formId: form.id,
+          userId: null,
+          answers: {},
+          submittedAt: new Date(0).toISOString(),
+        },
+        {
+          id: "response-legacy-user",
+          formId: form.id,
+          userId: admin.id,
+          answers: {},
+          submittedAt: new Date(0).toISOString(),
+        },
+      ],
+    };
+    localStorage.setItem("formkanwil:db:v5", JSON.stringify(legacyDatabase));
+    vi.resetModules();
+
+    try {
+      const { getDb } = await import("@/lib/formkanwil/store");
+      expect(getDb().responses[0]).toMatchObject({
+        respondentName: "Identitas tidak tersedia (data lama)",
+        respondentEmail: "",
+      });
+      expect(getDb().responses[1]).toMatchObject({
+        respondentName: admin.name,
+        respondentEmail: admin.email,
+      });
+    } finally {
+      localStorage.removeItem("formkanwil:db:v5");
+      localStorage.removeItem("formkanwil:db:v6");
     }
   });
 
@@ -218,6 +315,8 @@ describe("FormKanwil initial data", () => {
       id: `${formId}_response`,
       formId,
       userId: "usr_old",
+      respondentName: "Pengguna Lama",
+      respondentEmail: "old@kanwil.pegadaian.co.id",
       answers: {},
       submittedAt: new Date(0).toISOString(),
     });
@@ -249,7 +348,7 @@ describe("FormKanwil initial data", () => {
     try {
       const { getDb } = await import("@/lib/formkanwil/store");
       const restored = getDb();
-      const persisted = JSON.parse(localStorage.getItem("formkanwil:db:v5") ?? "null") as Database;
+      const persisted = JSON.parse(localStorage.getItem("formkanwil:db:v6") ?? "null") as Database;
 
       expect(restored.users.map((user) => user.username)).toEqual(["admin", "old-user"]);
       expect(restored.forms.map((form) => form.id)).toEqual(["frm_old"]);
@@ -265,6 +364,7 @@ describe("FormKanwil initial data", () => {
       localStorage.removeItem("formkanwil:db:v3");
       localStorage.removeItem("formkanwil:db:v4");
       localStorage.removeItem("formkanwil:db:v5");
+      localStorage.removeItem("formkanwil:db:v6");
     }
   });
 

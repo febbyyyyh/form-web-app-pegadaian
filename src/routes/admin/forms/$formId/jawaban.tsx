@@ -50,6 +50,8 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   formatAnswer,
+  getRespondentEmail,
+  getRespondentName,
   responsesToCsv,
   responsesToRows,
   summarizeQuestion,
@@ -111,7 +113,6 @@ function ResponsesPage() {
     [form, responses, db.users],
   );
   const invalidDateRange = Boolean(dateFrom && dateTo && dateFrom > dateTo);
-  const userOf = (id: string | null) => (id ? db.users.find((u) => u.id === id) : undefined);
 
   if (!form) {
     return (
@@ -410,6 +411,7 @@ function ResponsesPage() {
                     <TableRow className="bg-mint-soft/60 hover:bg-mint-soft/60">
                       <TableHead>ID jawaban</TableHead>
                       <TableHead>Nama</TableHead>
+                      <TableHead className="hidden sm:table-cell">Email</TableHead>
                       <TableHead>Waktu</TableHead>
                       <TableHead className="hidden md:table-cell">
                         {form.questions[0]?.label}
@@ -419,7 +421,6 @@ function ResponsesPage() {
                   </TableHeader>
                   <TableBody>
                     {responses.map((r) => {
-                      const u = userOf(r.userId);
                       return (
                         <TableRow
                           key={r.id}
@@ -433,7 +434,10 @@ function ResponsesPage() {
                             {r.id}
                           </TableCell>
                           <TableCell className="font-semibold">
-                            {u?.name ?? "Responden anonim"}
+                            {getRespondentName(r, db.users)}
+                          </TableCell>
+                          <TableCell className="hidden sm:table-cell">
+                            {getRespondentEmail(r, db.users) || "—"}
                           </TableCell>
                           <TableCell className="text-muted-foreground">
                             {format(new Date(r.submittedAt), "d MMM, HH:mm", { locale: localeId })}
@@ -465,13 +469,16 @@ function ResponsesPage() {
             <>
               <DialogHeader>
                 <DialogTitle className="font-display text-xl">
-                  {userOf(selected.userId)?.name ?? "Responden anonim"}
+                  {getRespondentName(selected, db.users)}
                 </DialogTitle>
                 <p className="font-mono text-xs text-muted-foreground">{selected.id}</p>
                 <p className="text-sm text-muted-foreground">
                   {format(new Date(selected.submittedAt), "d MMMM yyyy, HH:mm", {
                     locale: localeId,
                   })}
+                </p>
+                <p className="break-all text-sm text-muted-foreground">
+                  Email: {getRespondentEmail(selected, db.users) || "Tidak tersedia (data lama)"}
                 </p>
               </DialogHeader>
               <dl className="space-y-3">

@@ -40,6 +40,7 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart";
+import { getRespondentName } from "@/lib/formkanwil/logic";
 import { useCurrentUser, useDb } from "@/lib/formkanwil/store";
 import type { Form, FormResponse, Question } from "@/lib/formkanwil/types";
 
@@ -507,11 +508,10 @@ function AdminDashboard() {
                       {[...filteredResponses]
                         .sort((a, b) => b.submittedAt.localeCompare(a.submittedAt))
                         .map((response) => {
-                          const user = db.users.find((item) => item.id === response.userId);
                           return (
                             <TableRow key={response.id}>
                               <TableCell className="whitespace-nowrap font-semibold">
-                                {user?.name ?? "Responden anonim"}
+                                {getRespondentName(response, db.users)}
                               </TableCell>
                               <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
                                 {new Date(response.submittedAt).toLocaleString("id-ID")}

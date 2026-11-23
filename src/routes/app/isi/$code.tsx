@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { QuestionField } from "@/components/fk/QuestionField";
 import { EmptyState, ErrorNote, Spinner } from "@/components/fk/States";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import {
   getFormPages,
@@ -15,6 +16,7 @@ import {
   normalizeCode,
   submitResponse,
   validateAnswers,
+  validateRespondentIdentity,
 } from "@/lib/formkanwil/logic";
 import { getDb, setDb, useDb } from "@/lib/formkanwil/store";
 import type { Answers } from "@/lib/formkanwil/types";
@@ -43,6 +45,8 @@ function FillFormPage() {
 
   const [answers, setAnswers] = useState<Answers>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [respondentName, setRespondentName] = useState("");
+  const [respondentEmail, setRespondentEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
 
@@ -84,22 +88,52 @@ function FillFormPage() {
   const currentPage = formPages[currentPageIndex] ??
     formPages[0] ?? { id: "page-1", title: "Halaman 1" };
   const required = form.questions.filter((q) => q.required);
-  const doneRequired = required.filter((q) => isAnswered(shown[q.id])).length;
-  const progress = required.length ? Math.round((doneRequired / required.length) * 100) : 100;
+  const identityErrors = validateRespondentIdentity({
+    name: respondentName,
+    email: respondentEmail,
+  });
+  const requiredCount = required.length + 2;
+  const doneRequired =
+    required.filter((q) => isAnswered(shown[q.id])).length +
+    Number(!identityErrors.respondentName) +
+    Number(!identityErrors.respondentEmail);
+  const progress = Math.round((doneRequired / requiredCount) * 100);
+
+  function clearError(key: string) {
+    setErrors((current) => {
+      const { [key]: _removed, ...rest } = current;
+      return rest;
+    });
+  }
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (!form) return;
     setSubmitting(true);
     window.setTimeout(() => {
-      const result = submitResponse(getDb(), { formId: form.id, answers });
+      const result = submitResponse(getDb(), {
+        formId: form.id,
+        answers,
+        respondent: { name: respondentName, email: respondentEmail },
+      });
       setSubmitting(false);
       if (!result.ok) {
         if (result.reason === "invalid") {
           setErrors(result.errors ?? {});
           toast.error("Masih ada yang belum lengkap", {
-            description: "Cek pertanyaan yang ditandai merah, ya.",
+            description: "Cek identitas dan pertanyaan yang ditandai merah, ya.",
           });
+          const firstIdentityError = result.errors?.respondentName
+            ? "respondent-name"
+            : result.errors?.respondentEmail
+              ? "respondent-email"
+              : null;
+          if (firstIdentityError) {
+            document
+              .getElementById(firstIdentityError)
+              ?.scrollIntoView({ behavior: "smooth", block: "center" });
+            return;
+          }
           const first = form.questions.find((q) => result.errors?.[q.id]);
           if (first)
             document
@@ -143,7 +177,7 @@ function FillFormPage() {
               <div className="mb-1.5 flex justify-between text-xs font-semibold">
                 <span className="text-muted-foreground">Progres wajib diisi</span>
                 <span className="text-primary">
-                  {doneRequired}/{required.length}
+                  {doneRequired}/{requiredCount}
                 </span>
               </div>
               <Progress value={progress} className="h-2.5 bg-mint-soft [&>div]:bg-gradient-brand" />
@@ -152,6 +186,54 @@ function FillFormPage() {
         </section>
 
         <form onSubmit={onSubmit} className="space-y-4" noValidate>
+          <section className="card-soft space-y-4 p-5 sm:p-6">
+            <div>
+              <h2 className="font-display text-xl font-extrabold">Identitas responden</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Isi nama lengkap dan email sebelum menjawab pertanyaan.
+              </p>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <label htmlFor="respondent-name" className="text-sm font-medium">
+                  Nama lengkap <span className="text-destructive">*</span>
+                </label>
+                <Input
+                  id="respondent-name"
+                  required
+                  autoComplete="name"
+                  value={respondentName}
+                  aria-invalid={Boolean(errors.respondentName)}
+                  onChange={(event) => {
+                    setRespondentName(event.target.value);
+                    clearError("respondentName");
+                  }}
+                  placeholder="Masukkan nama lengkap"
+                />
+                {errors.respondentName && <ErrorNote>{errors.respondentName}</ErrorNote>}
+              </div>
+              <div className="space-y-1.5">
+                <label htmlFor="respondent-email" className="text-sm font-medium">
+                  Email <span className="text-destructive">*</span>
+                </label>
+                <Input
+                  id="respondent-email"
+                  type="email"
+                  required
+                  autoComplete="email"
+                  value={respondentEmail}
+                  aria-invalid={Boolean(errors.respondentEmail)}
+                  onChange={(event) => {
+                    setRespondentEmail(event.target.value);
+                    clearError("respondentEmail");
+                  }}
+                  placeholder="nama@contoh.com"
+                />
+                {errors.respondentEmail && <ErrorNote>{errors.respondentEmail}</ErrorNote>}
+              </div>
+            </div>
+          </section>
+
           {[currentPage].map((page) => {
             const questions = getPageQuestions(form, page.id);
             return (
@@ -224,7 +306,22 @@ function FillFormPage() {
                     { ...form, questions: currentQuestions },
                     answers,
                   );
-                  setErrors((current) => ({ ...current, ...pageErrors }));
+                  const identityErrors = validateRespondentIdentity({
+                    name: respondentName,
+                    email: respondentEmail,
+                  });
+                  setErrors((current) => ({ ...current, ...identityErrors, ...pageErrors }));
+                  const firstIdentityError = identityErrors.respondentName
+                    ? "respondent-name"
+                    : identityErrors.respondentEmail
+                      ? "respondent-email"
+                      : null;
+                  if (firstIdentityError) {
+                    document
+                      .getElementById(firstIdentityError)
+                      ?.scrollIntoView({ behavior: "smooth", block: "center" });
+                    return;
+                  }
                   const firstInvalid = currentQuestions.find((question) => pageErrors[question.id]);
                   if (firstInvalid) {
                     document

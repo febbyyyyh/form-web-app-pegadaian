@@ -8,6 +8,7 @@ Portal formulir digital untuk membantu administrator Kanwil Pegadaian membuat da
 - **Pengelolaan form** untuk membuat, mengedit, mengaktifkan, mencari, dan menutup form.
 - **Beragam jenis pertanyaan**, termasuk jawaban singkat, paragraf, pilihan, rating, angka, dan tanggal.
 - **Akses responden dengan kode** tanpa perlu masuk ke akun admin.
+- **Identitas responden wajib** berupa nama lengkap dan email, tercatat bersama setiap jawaban dan ekspor.
 - **Peninjauan dan ekspor jawaban** berdasarkan form dan rentang tanggal, dengan pratinjau CSV serta unduhan CSV atau PDF.
 - **Data demo tersimpan di browser** menggunakan `localStorage`; aplikasi dapat dicoba tanpa backend.
 

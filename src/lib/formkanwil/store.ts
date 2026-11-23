@@ -7,9 +7,9 @@ import type { Database, User } from "./types";
  * Browser-only store. All data lives in localStorage so the app runs with no backend.
  * Swap these functions for real API calls when a backend is connected.
  */
-const DB_KEY = "formkanwil:db:v5";
+const DB_KEY = "formkanwil:db:v6";
 const LEGACY_DB_KEYS = ["formkanwil:db:v2", "formkanwil:db:v3"];
-const PREVIOUS_DB_KEY = "formkanwil:db:v4";
+const PREVIOUS_DB_KEYS = ["formkanwil:db:v5", "formkanwil:db:v4"];
 const SESSION_KEY = "formkanwil:session:v2";
 const LEGACY_SESSION_KEY = "formkanwil:session:v1";
 
@@ -30,6 +30,23 @@ function keepSingleAdmin(database: Database): Database {
     (user) => user.role !== "admin" || user.id === primaryAdmin.id,
   );
   return users.length === database.users.length ? database : { ...database, users };
+}
+
+function addRespondentIdentity(database: Database): Database {
+  return {
+    ...database,
+    responses: database.responses.map((response) => {
+      const user = response.userId
+        ? database.users.find((item) => item.id === response.userId)
+        : undefined;
+      return {
+        ...response,
+        respondentName:
+          response.respondentName?.trim() || user?.name || "Identitas tidak tersedia (data lama)",
+        respondentEmail: response.respondentEmail?.trim() || user?.email || "",
+      };
+    }),
+  };
 }
 
 const isBrowser = () => typeof window !== "undefined" && typeof localStorage !== "undefined";
@@ -61,25 +78,28 @@ export function getDb(): Database {
     if (raw) {
       database = JSON.parse(raw) as Database;
     } else {
-      const previousRaw = localStorage.getItem(PREVIOUS_DB_KEY);
-      if (previousRaw) {
-        const previous = JSON.parse(previousRaw) as PreviousDatabase;
+      const previous = PREVIOUS_DB_KEYS.map((key) => ({
+        key,
+        raw: localStorage.getItem(key),
+      })).find((entry) => entry.raw);
+      if (previous?.raw) {
+        const oldDatabase = JSON.parse(previous.raw) as PreviousDatabase;
         database = {
-          version: previous.version,
-          users: previous.users.map((previousUser) => {
+          version: oldDatabase.version,
+          users: oldDatabase.users.map((previousUser) => {
             const user = { ...previousUser };
             delete user.unit;
             return user;
           }),
-          forms: previous.forms,
-          responses: previous.responses,
+          forms: oldDatabase.forms,
+          responses: oldDatabase.responses,
         };
-        localStorage.removeItem(PREVIOUS_DB_KEY);
+        localStorage.removeItem(previous.key);
       } else {
         database = createInitialDatabase();
       }
     }
-    database = keepSingleAdmin(database);
+    database = keepSingleAdmin(addRespondentIdentity(database));
     localStorage.setItem(DB_KEY, JSON.stringify(database));
     dbCache = database;
   } catch (error) {
@@ -90,7 +110,9 @@ export function getDb(): Database {
 }
 
 export function setDb(next: Database | ((db: Database) => Database)) {
-  const value = keepSingleAdmin(typeof next === "function" ? next(getDb()) : next);
+  const value = keepSingleAdmin(
+    addRespondentIdentity(typeof next === "function" ? next(getDb()) : next),
+  );
   dbCache = value;
   if (isBrowser()) localStorage.setItem(DB_KEY, JSON.stringify(value));
   emit();
